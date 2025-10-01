@@ -33,7 +33,9 @@ const sendSms = async (to: string, message: string) => {
     if (!token) missing.push("TWILIO_AUTH_TOKEN");
     if (!from) missing.push("TWILIO_PHONE_NUMBER");
     throw new Error(
-      `Twilio not configured. Missing: ${missing.join(", ")}. Ensure E.164 numbers: to=${to}, from=${from || "<unset>"}`
+      `Twilio not configured. Missing: ${missing.join(
+        ", ",
+      )}. Ensure E.164 numbers: to=${to}, from=${from || "<unset>"}`,
     );
   }
 
@@ -52,57 +54,61 @@ const sendSms = async (to: string, message: string) => {
     const twilioStatus = err?.response?.status;
     const twilioData = err?.response?.data;
     Logging.error({ twilioStatus, twilioData, hint: "Twilio SMS send failed" });
-    const reason = twilioData?.message || twilioData?.error_message || err.message;
+    const reason =
+      twilioData?.message || twilioData?.error_message || err.message;
     const code = twilioData?.code || twilioData?.error_code;
     throw new Error(`Twilio SMS failed${code ? ` [${code}]` : ""}: ${reason}`);
   }
 };
 
-const verifyAppleToken = async (idToken: string) => {
-  // Dev shortcut: allow locally signed fake token when enabled
-  if ((validateEnv.ALLOW_FAKE_APPLE_TOKEN || "false").toLowerCase() === "true") {
-    const secret = validateEnv.APPLE_FAKE_JWT_SECRET || "dev-fake-secret";
-    try {
-      const payload: any = jwt.verify(idToken, secret, { algorithms: ["HS256"] });
-      const appleUserId = payload.sub || payload.appleUserId || "fake-apple-user";
-      const email = payload.email;
-      return { appleUserId, email, payload };
-    } catch (e) {
-      throw new Error("Invalid fake Apple token");
-    }
-  }
-  // Use Apple's JWKS to verify token
+// const verifyAppleToken = async (idToken: string) => {
+//   // Dev shortcut: allow locally signed fake token when enabled
+//   if ((validateEnv.ALLOW_FAKE_APPLE_TOKEN || "false").toLowerCase() === "true") {
+//     const secret = validateEnv.APPLE_FAKE_JWT_SECRET || "dev-fake-secret";
+//     try {
+//       const payload: any = jwt.verify(idToken, secret, { algorithms: ["HS256"] });
+//       const appleUserId = payload.sub || payload.appleUserId || "fake-apple-user";
+//       const email = payload.email;
+//       return { appleUserId, email, payload };
+//     } catch (e) {
+//       throw new Error("Invalid fake Apple token");
+//     }
+//   }
+//   // Use Apple's JWKS to verify token
 
-  const client = jwksRsa({
-    jwksUri: "https://appleid.apple.com/auth/keys",
-    cache: true,
-    cacheMaxEntries: 5,
-    cacheMaxAge: 10 * 60 * 1000,
-  });
+//   const client = jwksRsa({
+//     jwksUri: "https://appleid.apple.com/auth/keys",
+//     cache: true,
+//     cacheMaxEntries: 5,
+//     cacheMaxAge: 10 * 60 * 1000,
+//   });
 
-  const decoded: any = jwt.decode(idToken, { complete: true });
-  if (!decoded || !decoded.header || !decoded.header.kid) {
-    throw new Error("Invalid Apple token");
-  }
-  const kid = decoded.header.kid as string;
-  const key = await client.getSigningKey(kid);
-  const signingKey = key.getPublicKey();
+//   const decoded: any = jwt.decode(idToken, { complete: true });
+//   if (!decoded || !decoded.header || !decoded.header.kid) {
+//     throw new Error("Invalid Apple token");
+//   }
+//   const kid = decoded.header.kid as string;
+//   const key = await client.getSigningKey(kid);
+//   const signingKey = key.getPublicKey();
 
-  const payload: any = jwt.verify(idToken, signingKey, {
-    algorithms: ["RS256"],
-    issuer: "https://appleid.apple.com",
-  });
+//   const payload: any = jwt.verify(idToken, signingKey, {
+//     algorithms: ["RS256"],
+//     issuer: "https://appleid.apple.com",
+//   });
 
-  const appleUserId = payload.sub as string;
-  const email = payload.email as string | undefined;
-  return { appleUserId, email, payload };
-};
+//   const appleUserId = payload.sub as string;
+//   const email = payload.email as string | undefined;
+//   return { appleUserId, email, payload };
+// };
 
 class AuthService {
   static async sendOtp(phoneNumber: string, state: string) {
     const allowed = parseAllowedStates();
     if (!allowed.includes(state.trim().toLowerCase())) {
-      return { success: false, message: "Service not available in your state." };
+      return {
+        success: false,
+        message: "Service not available in your state.",
+      };
     }
 
     const otp = generateOtp();
@@ -111,7 +117,7 @@ class AuthService {
     await OtpVerification.findOneAndUpdate(
       { phoneNumber },
       { phoneNumber, state, otp, otpExpiry: expiry },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     await sendSms(phoneNumber, `Your verification code is ${otp}`);
@@ -130,7 +136,7 @@ class AuthService {
     // Mark user as verified if user exists for this phoneNumber; do not auto-create
     await User.findOneAndUpdate(
       { phoneNumber },
-      { $set: { isVerified: true, state: record.state } }
+      { $set: { isVerified: true, state: record.state } },
     ).exec();
 
     await OtpVerification.deleteOne({ phoneNumber }).exec();
@@ -158,5 +164,3 @@ class AuthService {
 }
 
 export default AuthService;
-
-
