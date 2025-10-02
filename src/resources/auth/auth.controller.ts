@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import Controller from "../../utils/interfaces/controller.interface";
 import validationMiddleware from "../../middleware/val.middleware";
-import AuthValidation from "./auth.validation";
+// import AuthValidation from "./auth.validation";
 import AuthService from "./auth.service";
 import passport from "passport";
 
@@ -14,16 +14,16 @@ class AuthController implements Controller {
   }
 
   private initializeRoutes(): void {
-    this.router.post(
-      `${this.path}/send-otp`,
-      validationMiddleware(AuthValidation.sendOtp),
-      this.sendOtp
-    );
-    this.router.post(
-      `${this.path}/verify-otp`,
-      validationMiddleware(AuthValidation.verifyOtp),
-      this.verifyOtp
-    );
+    // this.router.post(
+    //   `${this.path}/send-otp`,
+    //   validationMiddleware(AuthValidation.sendOtp),
+    //   this.sendOtp
+    // );
+    // this.router.post(
+    //   `${this.path}/verify-otp`,
+    //   validationMiddleware(AuthValidation.verifyOtp),
+    //   this.verifyOtp
+    // );
     // this.router.post(
     //   `${this.path}/apple-signin`,
     //   validationMiddleware(AuthValidation.appleSignin),
@@ -50,25 +50,25 @@ class AuthController implements Controller {
     );
   }
 
-  private async sendOtp(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { phoneNumber, state } = req.body as { phoneNumber: string; state: string };
-      const result = await AuthService.sendOtp(phoneNumber, state);
-      return res.status(200).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
+  // private async sendOtp(req: Request, res: Response, next: NextFunction) {
+  //   try {
+  //     const { phoneNumber, state } = req.body as { phoneNumber: string; state: string };
+  //     const result = await AuthService.sendOtp(phoneNumber, state);
+  //     return res.status(200).json(result);
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // }
 
-  private async verifyOtp(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { phoneNumber, otp } = req.body as { phoneNumber: string; otp: string };
-      const result = await AuthService.verifyOtp(phoneNumber, otp);
-      return res.status(200).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
+  // private async verifyOtp(req: Request, res: Response, next: NextFunction) {
+  //   try {
+  //     const { phoneNumber, otp } = req.body as { phoneNumber: string; otp: string };
+  //     const result = await AuthService.verifyOtp(phoneNumber, otp);
+  //     return res.status(200).json(result);
+  //   } catch (error) {
+  //     next(error);
+  //   }
+  // }
 
   // private async appleSignin(req: Request, res: Response, next: NextFunction) {
   //   try {

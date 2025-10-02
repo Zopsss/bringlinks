@@ -20,10 +20,12 @@ import {
   getUserRecommendRooms,
   updateUser,
 } from "./user.service";
+import { registerAdmin } from "./admin.service";
 import config from "config";
 import Logging from "../../library/logging";
 import validationMiddleware from "../../middleware/val.middleware";
 import validate from "./user.validation";
+import adminValidation from "./admin.validation";
 import RedisClientMiddleware from "../../middleware/redis.middleware";
 import { isUserAccount } from "../../middleware/authorization.middleware";
 import { ImageNAME } from "../../utils/ImageServices/helperFunc.ts/room.Img";
@@ -50,6 +52,11 @@ class UserController implements Controller {
       `${this.path}/register`,
       validationMiddleware(validate.create),
       this.register
+    );
+    this.router.post(
+      `${this.path}/register-admin`,
+      validationMiddleware(adminValidation.registerAdmin),
+      this.registerAdmin
     );
     this.router.post(
       `${this.path}/login`,
@@ -149,6 +156,27 @@ class UserController implements Controller {
       next(new HttpException(400, err.message));
     }
   };
+
+  private registerAdmin = async(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<Response | void> =>{
+    try {
+      const [createdAdmin, token, refreshToken] = await registerAdmin(req.body);
+
+      res.cookie(validateEnv.COOKIE, token);
+      res.status(201).send({ 
+        createdAdmin, 
+        token, 
+        refreshToken,
+        message: "Admin created successfully"
+      });
+    } catch (err: any) {
+      next(new HttpException(400, err.message));
+    }
+  };
+
 
   private login = async (
     req: Request,

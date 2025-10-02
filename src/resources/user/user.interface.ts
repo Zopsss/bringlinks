@@ -11,7 +11,8 @@ export interface IUsers extends Document {
   otp?: string;
   otpExpiry?: Date;
   isVerified?: boolean;
-  appleId?: string;
+  signupCode?: string; // For registration validation only
+  // appleId?: string;
   googleId?: string;
   pendingRoomsRequest: mongoose.Types.ObjectId[];
   enteredRooms: mongoose.Types.ObjectId[];

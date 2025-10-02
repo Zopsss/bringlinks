@@ -232,10 +232,10 @@ const UserSchema = new Schema<IUserDocument>(
     ],
       phoneNumber: { type: String },
       state: { type: String },
-      otp: { type: String },
-      otpExpiry: { type: Date },
+      // otp: { type: String },
+      // otpExpiry: { type: Date },
       isVerified: { type: Boolean, default: false },
-      appleId: { type: String },
+      // appleId: { type: String },
       googleId: { type: String },
   },
   { timestamps: true, minimize: false }

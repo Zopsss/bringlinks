@@ -14,6 +14,8 @@ import mongoose from "mongoose";
 import { getSignedUrl } from "@aws-sdk/cloudfront-signer";
 import { deleteAviIMG, retrieveIMG } from "../../utils/ImageServices/user.Img";
 import { checkImageUrl } from "../../utils/ImageServices/helperFunc.ts/checkImgUrlExpiration";
+import { validateAndUseSignupCode } from "../signupCode/signupCode.service";
+import { validateEnv } from "../../../config/validateEnv";
 
 const getUserUsername = async (username: string) => {
   try {
@@ -60,26 +62,55 @@ const refreshTokenUser = async (token: string, userId: string) => {
     throw err; // Re-throw the error so the controller can handle it
   }
 };
-const registerUser = async (user: IUserDocument) => {
+const registerUser = async (userData: any) => {
   try {
-    const { auth } = user;
+    const { auth, signupCode, state, ...userProfile } = userData;
 
-    const foundUser: IUserDocument = await User.findByUsername(auth.username);
+    const parseAllowedStates = (): string[]=>{
+      const raw = validateEnv.ALLOWED_STATES || "";
+      return raw
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => !!s);
+    };
 
-    if (foundUser) {
-      const msg = "the given username is already in use";
-      throw new Error(msg);
+    const allowedStates = parseAllowedStates();
+    if (!allowedStates.includes(state.trim().toLowerCase())) {
+      throw new Error("Service not available in your state");
     }
 
-    const createdUser = await User.create(user);
-    Logging.log(createdUser);
-    if (!createdUser) throw new Error("Not registered");
+    const isValidCode = await validateAndUseSignupCode(signupCode);
+    if (!isValidCode) {
+      throw new Error("Invalid signup code or code has reached maximum usage limit");
+    }
+
+    const foundUser: IUserDocument = await User.findByUsername(auth.username);
+    if (foundUser) {
+      throw new Error("The given username is already in use");
+    }
+
+    const foundEmail = await User.findOne({ "auth.email": auth.email });
+    if (foundEmail) {
+      throw new Error("The given email is already in use");
+    }
+
+    const userToCreate = {
+      auth,
+      profile: userProfile.profile,
+      state,
+      isVerified: true, 
+    };
+
+    const createdUser = await User.create(userToCreate);
+    Logging.log(`User created with signup code: ${createdUser._id}`);
+    
+    if (!createdUser) throw new Error("User registration failed");
 
     const [token, refreshToken]: Secret[] = jwt.CreateToken({
       _id: createdUser._id,
       role: IRoles.USER,
-      username: user.auth.username,
-      email: user.auth.email,
+      username: createdUser.auth.username,
+      email: createdUser.auth.email,
     });
 
     const createdUserId = createdUser._id as string;
@@ -100,8 +131,7 @@ const registerUser = async (user: IUserDocument) => {
 
     return [userWithoutPassword, token, refreshToken];
   } catch (err: any) {
-    Logging.error(err.message);
-    Logging.error(err.message);
+    Logging.error(`Registration error: ${err.message}`);
     throw err.message;
   }
 };
