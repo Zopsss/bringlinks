@@ -1,6 +1,6 @@
 import Creator from "./creator.model";
 import User from "../user.model";
-import SignupCode from "../../signupCode/signupCode.model";
+import { validateAndUseSignupCode } from "../../signupCode/signupCode.service";
 import { ICreatorRegistrationRequest, ICreatorSignupRequest, StripeAccountStatus } from "./creator.interface";
 import { validateEnv } from "../../../../config/validateEnv";
 import Logging from "../../../library/logging";
@@ -31,19 +31,9 @@ export const signupAsCreator = async (creatorData: ICreatorSignupRequest) => {
       throw new Error("Creator registration not available in your state");
     }
 
-    const signupCodeDoc = await SignupCode.findOne({ 
-      code: signupCode,
-      isActive: true,
-      isUsed: false,
-      $or: [
-        { expiresAt: { $exists: false } },
-        { expiresAt: null },
-        { expiresAt: { $gt: new Date() } }
-      ]
-    });
-
-    if (!signupCodeDoc) {
-      throw new Error("Invalid or expired signup code");
+    const codeConsumed = await validateAndUseSignupCode(signupCode);
+    if (!codeConsumed) {
+      throw new Error("Invalid signup code or code has reached maximum usage limit");
     }
 
     const saltRounds = 10;
@@ -84,12 +74,6 @@ export const signupAsCreator = async (creatorData: ICreatorSignupRequest) => {
     await User.findByIdAndUpdate(user._id, {
       role: "CREATOR",
       creator: creator._id
-    });
-
-    await SignupCode.findByIdAndUpdate(signupCodeDoc._id, { 
-      isUsed: true,
-      usedBy: user._id.toString(),
-      usedAt: new Date()
     });
 
     const [accessToken, refreshToken] = jwt.CreateToken({ userId: user._id.toString() });
@@ -144,14 +128,9 @@ export const registerCreator = async (creatorData: ICreatorRegistrationRequest) 
       throw new Error("Creator registration not available in your state");
     }
 
-    const signupCodeDoc = await SignupCode.findOne({ 
-      code: signupCode,
-      isUsed: false,
-      expiresAt: { $gt: new Date() }
-    });
-
-    if (!signupCodeDoc) {
-      throw new Error("Invalid or expired signup code");
+    const codeConsumed = await validateAndUseSignupCode(signupCode);
+    if (!codeConsumed) {
+      throw new Error("Invalid signup code or code has reached maximum usage limit");
     }
 
     const existingCreator = await Creator.findOne({ userId });
@@ -168,12 +147,6 @@ export const registerCreator = async (creatorData: ICreatorRegistrationRequest) 
     if (!creator) {
       throw new Error("Creator registration failed");
     }
-
-    await SignupCode.findByIdAndUpdate(signupCodeDoc._id, { 
-      isUsed: true,
-      usedBy: userId,
-      usedAt: new Date()
-    });
 
     await User.findByIdAndUpdate(userId, { 
       role: "CREATOR",

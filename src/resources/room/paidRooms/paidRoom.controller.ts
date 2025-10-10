@@ -49,6 +49,12 @@ class PaidRoomController implements Controller {
       isUserAccount,
       this.getCreatorStripeLoginLink
     );
+    this.router.get(
+      `/creator/:userId/stripe/balance`,
+      RequiredAuth,
+      isUserAccount,
+      this.getCreatorStripeBalance
+    );
     this.router.post(
       `/creator/:userId/stripe/payout`,
       RequiredAuth,
@@ -115,6 +121,9 @@ class PaidRoomController implements Controller {
       const { quantity = 1, tierName, successUrl, cancelUrl } = req.body;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
       if (!roomId) return res.status(400).json({ message: "Room ID is required" });
+      if (!tierName ||typeof tierName !== "string" || !tierName.trim()){
+        return res.status(400).json({ message: "tierName is required"});
+      }
 
       const { default: Rooms } = await import("../room.model");
       const roomDoc = await Rooms.findById(roomId).select("created_user");
@@ -128,7 +137,13 @@ class PaidRoomController implements Controller {
 
       const paidRoom = await getPaidRoom(roomId);
       const tiers = paidRoom.tickets.pricing || [];
-      const selected = tierName ? tiers.find((t: any) => t.title === tierName || t.tiers === tierName) : tiers[0];
+      if(!tiers ||tiers.length === 0) return res.status(404).json({ message: "No tiers set for this room" });
+      const normalizedTier =String(tierName).trim().toLowerCase();
+      const selected= tiers.find((t: any) =>{
+        const title = String(t.title || "").trim().toLowerCase();
+        const tierEnum= String(t.tiers || "").trim().toLowerCase();
+        return title === normalizedTier ||tierEnum === normalizedTier;
+      });
       if (!selected) return res.status(400).json({ message: "Tier not found" });
       if (selected.available < quantity) return res.status(400).json({ message: "Not enough tickets available" });
       const ticketAmount = selected.price;
@@ -191,16 +206,53 @@ class PaidRoomController implements Controller {
   ): Promise<Response | void> => {
     try {
       const userId = req.user?._id;
-      const { amountCents } = req.body;
-      if (!amountCents || amountCents <= 0) return res.status(400).json({ message: "amountCents required" });
+      let { amountCents } = req.body as { amountCents?: number };
       const { default: Creator } = await import("../../user/creator/creator.model");
       const creator = await Creator.findOne({ userId });
       if (!creator || !creator.stripeConnectAccountId) {
         return res.status(404).json({ message: "Creator Stripe account not found" });
       }
-      const payout = await (await import("../../../utils/stripe/stripe.service")).default.createPayout(creator.stripeConnectAccountId, amountCents, "usd");
+      const StripeSvc = (await import("../../../utils/stripe/stripe.service")).default;
+
+      const balance = await StripeSvc.getAccountBalance(creator.stripeConnectAccountId);
+      const availableUsd= (balance.available ||[]).filter((b: any) => b.currency?.toLowerCase() ==="usd");
+      const availableCents= availableUsd.reduce((sum: number, b: any) => sum +(Number(b.amount) || 0),0);
+
+      if (!amountCents|| amountCents <= 0){
+        amountCents = availableCents;
+      }
+
+      if (amountCents <= 0){
+        return res.status(400).json({ message: "No available balance to payout" });
+      }
+
+      if (amountCents > availableCents){
+        return res.status(400).json({ message: "Payout amount exceeds available balance", availableCents });
+      }
+
+      const payout = await StripeSvc.createPayout(creator.stripeConnectAccountId, amountCents, "usd");
       return res.status(200).json({ success: true, payout });
     } catch (err: any) {
+      return next(new HttpException(400, err.message));
+    }
+  };
+
+  private getCreatorStripeBalance =async(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<Response |void> =>{
+    try {
+      const userId = req.user?._id;
+      const { default: Creator } = await import("../../user/creator/creator.model");
+      const creator = await Creator.findOne({ userId });
+      if (!creator || !creator.stripeConnectAccountId) {
+        return res.status(404).json({ message: "Creator Stripe account not found" });
+      }
+      const StripeSvc = (await import("../../../utils/stripe/stripe.service")).default;
+      const balance = await StripeSvc.getAccountBalance(creator.stripeConnectAccountId);
+      return res.status(200).json({ success: true, balance });
+    } catch (err: any){
       return next(new HttpException(400, err.message));
     }
   };

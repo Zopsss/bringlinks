@@ -6,7 +6,7 @@ export const creatorRegistration = Joi.object<ICreatorRegistrationRequest>().key
   signupCode: Joi.string().required(),
   portfolio: Joi.string().uri().optional(),
   socialMedia: Joi.array().items(Joi.string().uri()).optional(),
-  experience: Joi.string().min(10).max(500).optional(),
+  experience: Joi.string().min(2).max(500).optional(),
 });
 
 export const creatorSignup = Joi.object<ICreatorSignupRequest>().keys({
@@ -18,7 +18,7 @@ export const creatorSignup = Joi.object<ICreatorSignupRequest>().keys({
   signupCode: Joi.string().required(),
   portfolio: Joi.string().uri().optional(),
   socialMedia: Joi.array().items(Joi.string().uri()).optional(),
-  experience: Joi.string().min(10).max(500).optional(),
+  experience: Joi.string().min(2).max(500).optional(),
 });
 
 export const stripeConnectOnboarding = Joi.object().keys({
