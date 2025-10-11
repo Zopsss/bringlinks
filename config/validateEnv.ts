@@ -67,4 +67,5 @@ export const validateEnv = cleanEnv(process.env, {
   GOOGLE_CLIENT_ID: str({ default: "" }),
   GOOGLE_CLIENT_SECRET: str({ default: "" }),
   GOOGLE_CALLBACK_URL: str({ default: "" }),
+  ADMIN_REGISTRATION_SECRET: str({ default: "" }),
 });

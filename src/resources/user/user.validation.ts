@@ -33,6 +33,8 @@ const create = Joi.object<IUserDocument>().keys({
       .min(3)
       .required(),
   }),
+  signupCode: Joi.string().length(6).alphanum().required(),
+  state: Joi.string().trim().required(),
   profile: Joi.object<IUserProfile>().keys({
     firstName: Joi.string().min(3).max(30).required(),
     lastName: Joi.string().min(3).max(30).required(),

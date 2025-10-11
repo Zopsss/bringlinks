@@ -22,44 +22,45 @@ const generateOtp = (): string => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-const sendSms = async (to: string, message: string) => {
-  const sid = validateEnv.TWILIO_ACCOUNT_SID as string;
-  const token = validateEnv.TWILIO_AUTH_TOKEN as string;
-  const from = validateEnv.TWILIO_PHONE_NUMBER as string;
+// COMMENTED OUT - Twilio SMS functionality disabled for signup code implementation
+// const sendSms = async (to: string, message: string) => {
+//   const sid = validateEnv.TWILIO_ACCOUNT_SID as string;
+//   const token = validateEnv.TWILIO_AUTH_TOKEN as string;
+//   const from = validateEnv.TWILIO_PHONE_NUMBER as string;
 
-  if (!sid || !token || !from) {
-    const missing: string[] = [];
-    if (!sid) missing.push("TWILIO_ACCOUNT_SID");
-    if (!token) missing.push("TWILIO_AUTH_TOKEN");
-    if (!from) missing.push("TWILIO_PHONE_NUMBER");
-    throw new Error(
-      `Twilio not configured. Missing: ${missing.join(
-        ", ",
-      )}. Ensure E.164 numbers: to=${to}, from=${from || "<unset>"}`,
-    );
-  }
+//   if (!sid || !token || !from) {
+//     const missing: string[] = [];
+//     if (!sid) missing.push("TWILIO_ACCOUNT_SID");
+//     if (!token) missing.push("TWILIO_AUTH_TOKEN");
+//     if (!from) missing.push("TWILIO_PHONE_NUMBER");
+//     throw new Error(
+//       `Twilio not configured. Missing: ${missing.join(
+//         ", ",
+//       )}. Ensure E.164 numbers: to=${to}, from=${from || "<unset>"}`,
+//     );
+//   }
 
-  const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
-  const form = new URLSearchParams();
-  form.append("To", to);
-  form.append("From", from);
-  form.append("Body", message);
+//   const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
+//   const form = new URLSearchParams();
+//   form.append("To", to);
+//   form.append("From", from);
+//   form.append("Body", message);
 
-  try {
-    await axios.post(url, form.toString(), {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      auth: { username: sid, password: token },
-    });
-  } catch (err: any) {
-    const twilioStatus = err?.response?.status;
-    const twilioData = err?.response?.data;
-    Logging.error({ twilioStatus, twilioData, hint: "Twilio SMS send failed" });
-    const reason =
-      twilioData?.message || twilioData?.error_message || err.message;
-    const code = twilioData?.code || twilioData?.error_code;
-    throw new Error(`Twilio SMS failed${code ? ` [${code}]` : ""}: ${reason}`);
-  }
-};
+//   try {
+//     await axios.post(url, form.toString(), {
+//       headers: { "Content-Type": "application/x-www-form-urlencoded" },
+//       auth: { username: sid, password: token },
+//     });
+//   } catch (err: any) {
+//     const twilioStatus = err?.response?.status;
+//     const twilioData = err?.response?.data;
+//     Logging.error({ twilioStatus, twilioData, hint: "Twilio SMS send failed" });
+//     const reason =
+//       twilioData?.message || twilioData?.error_message || err.message;
+//     const code = twilioData?.code || twilioData?.error_code;
+//     throw new Error(`Twilio SMS failed${code ? ` [${code}]` : ""}: ${reason}`);
+//   }
+// };
 
 // const verifyAppleToken = async (idToken: string) => {
 //   // Dev shortcut: allow locally signed fake token when enabled
@@ -102,45 +103,61 @@ const sendSms = async (to: string, message: string) => {
 // };
 
 class AuthService {
+  // COMMENTED OUT - OTP functionality disabled for signup code implementation
+  // static async sendOtp(phoneNumber: string, state: string) {
+  //   const allowed = parseAllowedStates();
+  //   if (!allowed.includes(state.trim().toLowerCase())) {
+  //     return {
+  //       success: false,
+  //       message: "Service not available in your state.",
+  //     };
+  //   }
+
+  //   const otp = generateOtp();
+  //   const expiry = new Date(Date.now() + 5 * 60 * 1000);
+
+  //   await OtpVerification.findOneAndUpdate(
+  //     { phoneNumber },
+  //     { phoneNumber, state, otp, otpExpiry: expiry },
+  //     { upsert: true, new: true },
+  //   );
+
+  //   await sendSms(phoneNumber, `Your verification code is ${otp}`);
+  //   return { success: true, message: "OTP sent successfully." };
+  // }
+
   static async sendOtp(phoneNumber: string, state: string) {
-    const allowed = parseAllowedStates();
-    if (!allowed.includes(state.trim().toLowerCase())) {
-      return {
-        success: false,
-        message: "Service not available in your state.",
-      };
-    }
-
-    const otp = generateOtp();
-    const expiry = new Date(Date.now() + 5 * 60 * 1000);
-
-    await OtpVerification.findOneAndUpdate(
-      { phoneNumber },
-      { phoneNumber, state, otp, otpExpiry: expiry },
-      { upsert: true, new: true },
-    );
-
-    await sendSms(phoneNumber, `Your verification code is ${otp}`);
-    return { success: true, message: "OTP sent successfully." };
+    return {
+      success: false,
+      message: "OTP functionality is currently disabled. Please use signup codes for registration.",
+    };
   }
 
+  // COMMENTED OUT - OTP verification disabled for signup code implementation
+  // static async verifyOtp(phoneNumber: string, otp: string) {
+  //   const record = await OtpVerification.findOne({ phoneNumber }).exec();
+  //   if (!record || record.otp !== otp) {
+  //     return { success: false, message: "Invalid OTP." };
+  //   }
+  //   if (record.otpExpiry && record.otpExpiry.getTime() < Date.now()) {
+  //     return { success: false, message: "OTP expired." };
+  //   }
+
+  //   // Mark user as verified if user exists for this phoneNumber; do not auto-create
+  //   await User.findOneAndUpdate(
+  //     { phoneNumber },
+  //     { $set: { isVerified: true, state: record.state } },
+  //   ).exec();
+
+  //   await OtpVerification.deleteOne({ phoneNumber }).exec();
+  //   return { success: true, message: "OTP verified." };
+  // }
+
   static async verifyOtp(phoneNumber: string, otp: string) {
-    const record = await OtpVerification.findOne({ phoneNumber }).exec();
-    if (!record || record.otp !== otp) {
-      return { success: false, message: "Invalid OTP." };
-    }
-    if (record.otpExpiry && record.otpExpiry.getTime() < Date.now()) {
-      return { success: false, message: "OTP expired." };
-    }
-
-    // Mark user as verified if user exists for this phoneNumber; do not auto-create
-    await User.findOneAndUpdate(
-      { phoneNumber },
-      { $set: { isVerified: true, state: record.state } },
-    ).exec();
-
-    await OtpVerification.deleteOne({ phoneNumber }).exec();
-    return { success: true, message: "OTP verified." };
+    return {
+      success: false,
+      message: "OTP functionality is currently disabled. Please use signup codes for registration.",
+    };
   }
 
   // static async appleSignin(appleToken: string) {

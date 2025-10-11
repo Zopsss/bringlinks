@@ -3,9 +3,10 @@ import jwt from "jsonwebtoken";
 import { verifyAccessToken } from "../utils/authentication/jwt.createtoken";
 import Logging from "../library/logging";
 import { IRoles } from "resources/user/user.interface";
+import User from "../resources/user/user.model";
 
 // Middleware to authenticate token
-export const RequiredAuth = (
+export const RequiredAuth = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -21,7 +22,19 @@ export const RequiredAuth = (
   try {
     const decoded = verifyAccessToken(token) as jwt.JwtPayload;
     const userId = decoded?._id || decoded?.userId;
-    req.user = { _id: userId, role: decoded?.role } as any;
+    
+    const user = await User.findById(userId).select('role state');
+    
+    if (!user) {
+      return res.status(403).json({ message: "User not found" });
+    }
+    
+    req.user = { 
+      _id: userId, 
+      role: user.role || decoded?.role, 
+      state: user.state 
+    } as any;
+    
     next();
   } catch (error) {
     return res.status(403).json({ message: "Token invalid or expired" });
