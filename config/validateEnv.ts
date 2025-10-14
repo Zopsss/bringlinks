@@ -72,4 +72,7 @@ export const validateEnv = cleanEnv(process.env, {
   STRIPE_PUBLISHABLE_KEY: str({ default: "" }),
   STRIPE_WEBHOOK_SECRET: str({ default: "" }),
   FORCE_CREATOR_ELIGIBLE: str({ default: "false" }), //if set to true, creator can create paid room without creating stripe connect account  
+  SENDGRID_API_KEY: str({ default: "" }),
+  ADMIN_NOTIFICATION_EMAIL: str({ default: "" }),
+  EMAIL_FROM: str({ default: "" }),
 });

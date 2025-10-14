@@ -23,7 +23,7 @@ export const RequiredAuth = async (
     const decoded = verifyAccessToken(token) as jwt.JwtPayload;
     const userId = decoded?._id || decoded?.userId;
     
-    const user = await User.findById(userId).select('role state');
+    const user = await User.findById(userId).select('role state auth.email auth.username profile.name');
     
     if (!user) {
       return res.status(403).json({ message: "User not found" });
@@ -31,8 +31,11 @@ export const RequiredAuth = async (
     
     req.user = { 
       _id: userId, 
-      role: user.role || decoded?.role, 
-      state: user.state 
+      role: (user as any).role || decoded?.role, 
+      state: (user as any).state,
+      email: (user as any)?.auth?.email,
+      username: (user as any)?.auth?.username,
+      name: (user as any)?.profile?.name,
     } as any;
     
     next();
