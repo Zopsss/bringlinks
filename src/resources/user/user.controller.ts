@@ -19,20 +19,24 @@ import {
   updateUserPreferences,
   getUserRecommendRooms,
   updateUser,
+  requestPassword,
 } from "./user.service";
-import { registerAdmin } from "./admin.service";
+import { registerAdmin } from "./admin/admin.service";
 import config from "config";
 import Logging from "../../library/logging";
 import validationMiddleware from "../../middleware/val.middleware";
 import validate from "./user.validation";
-import adminValidation from "./admin.validation";
+import adminValidation from "./admin/admin.validation";
 import RedisClientMiddleware from "../../middleware/redis.middleware";
-import { isUserAccount } from "../../middleware/authorization.middleware";
+import {
+  isUserAccount,
+  isUserRefreshToken,
+} from "../../middleware/authorization.middleware";
 import { ImageNAME } from "../../utils/ImageServices/helperFunc.ts/room.Img";
 import { validateEnv } from "../../../config/validateEnv";
 import { Secret } from "jsonwebtoken";
 import { AuthorizeRole, RequiredAuth } from "../../middleware/auth.middleware";
-import { IRoles } from "./user.interface";
+import { IRoles, IUserDocument } from "./user.interface";
 import { putS3Object } from "../../utils/ImageServices/user.Img";
 import { UploadedFile } from "express-fileupload";
 import fileUpload from "express-fileupload";
@@ -52,6 +56,11 @@ class UserController implements Controller {
       `${this.path}/register`,
       validationMiddleware(validate.create),
       this.register
+    );
+    this.router.post(
+      `${this.path}/request/password`,
+      validationMiddleware(validate.requestPasswordChange),
+      this.requestPasswordChange
     );
     this.router.post(
       `${this.path}/register-admin`,
@@ -77,6 +86,7 @@ class UserController implements Controller {
     );
     this.router.put(
       `${this.path}/userpreferences/:userId`,
+      validationMiddleware(validate.userPreferences),
       RequiredAuth,
       this.updateUserPreferences
     );
@@ -91,10 +101,9 @@ class UserController implements Controller {
       this.getSchedule
     );
     this.router.patch(
-      `${this.path}/updatepassword/:userId`,
+      `${this.path}/updatepassword/:userId/:refreshToken`,
       validationMiddleware(validate.changePassword),
-      RequiredAuth,
-      isUserAccount,
+      isUserRefreshToken,
       this.changePassword
     );
     this.router.delete(
@@ -157,26 +166,40 @@ class UserController implements Controller {
     }
   };
 
-  private registerAdmin = async(
+  private registerAdmin = async (
     req: Request,
     res: Response,
     next: NextFunction
-  ): Promise<Response | void> =>{
+  ): Promise<Response | void> => {
     try {
       const [createdAdmin, token, refreshToken] = await registerAdmin(req.body);
 
       res.cookie(validateEnv.COOKIE, token);
-      res.status(201).send({ 
-        createdAdmin, 
-        token, 
+      res.status(201).send({
+        createdAdmin,
+        token,
         refreshToken,
-        message: "Admin created successfully"
+        message: "Admin created successfully",
       });
     } catch (err: any) {
       next(new HttpException(400, err.message));
     }
   };
+  private requestPasswordChange = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<Response | void> => {
+    try {
+      Logging.log(req.body);
 
+      await requestPassword(req.body);
+
+      res.status(200).send("Email Sent");
+    } catch (err: any) {
+      next(new HttpException(400, err.message));
+    }
+  };
 
   private login = async (
     req: Request,
@@ -283,7 +306,8 @@ class UserController implements Controller {
     try {
       const { refreshToken } = req.body.token;
       const { userId } = req.params;
-      if (!refreshToken) return res.status(400).send("Refresh token is required");
+      if (!refreshToken)
+        return res.status(400).send("Refresh token is required");
 
       const { newToken, freshToken }: Secret[] | any = await refreshTokenUser(
         refreshToken,
@@ -306,7 +330,8 @@ class UserController implements Controller {
     next: NextFunction
   ): Promise<Response | void> => {
     try {
-      if (!req.user?._id) return res.status(401).json({ message: "Unauthorized" });
+      if (!req.user?._id)
+        return res.status(401).json({ message: "Unauthorized" });
       const user = await clearRefreshToken(req.user._id as string);
 
       if (!user)
@@ -363,13 +388,23 @@ class UserController implements Controller {
     next: NextFunction
   ): Promise<Response | void> => {
     try {
-      if (!req.user?._id) return res.status(401).json({ message: "Unauthorized" });
+      if (!req.user?._id)
+        return res.status(401).json({ message: "Unauthorized" });
       const user = await updatePassword(req.body, req.user._id as string);
 
       if (!user)
         return res.status(400).json({ message: "Error updating password" });
 
-      res.status(200).send(req.body);
+      //cerate new token
+      const [token, refreshToken]: Secret[] | any = await refreshTokenUser(
+        user.refreshToken,
+        user._id
+      );
+
+      if (!token || !refreshToken)
+        return res.status(400).json({ message: "Token not created" });
+
+      res.status(200).send({ token, user });
     } catch (err: any) {
       next(new HttpException(400, err.message));
     }
@@ -425,7 +460,8 @@ class UserController implements Controller {
       if (!userId) return res.status(400).send("UserId is required");
       if (!fileType) return res.status(400).send("File type is required");
       if (!req.files) return res.status(400).send("File is required");
-      if (!req.files.image) return res.status(400).send("Image file is required");
+      if (!req.files.image)
+        return res.status(400).send("Image file is required");
 
       const { name, data, mimetype } = req.files.image as UploadedFile;
       const fileName = `${userId}/${fileType}/${imgName}-${Date.now()}${name}`;
@@ -445,7 +481,8 @@ class UserController implements Controller {
 
       res.status(201).send({ signedUrl });
     } catch (err: any) {
-      const msg = typeof err === "string" ? err : err?.message || "Upload failed";
+      const msg =
+        typeof err === "string" ? err : err?.message || "Upload failed";
       next(new HttpException(400, msg));
     }
   };
@@ -508,7 +545,6 @@ class UserController implements Controller {
 
       if (!recommendedRooms)
         return res.status(400).json({ message: "No recommend rooms found" });
-
 
       res.status(200).json(recommendedRooms);
     } catch (err: any) {

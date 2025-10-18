@@ -19,7 +19,7 @@ if (!loadedPath) {
 // Validate environment variables
 export const validateEnv = cleanEnv(process.env, {
   NODE_ENV: str({
-    choices: ["development", "production"],
+    choices: ["development", "staging", "production"],
     default: "development",
   }),
   Mongo_User: str(),
@@ -44,13 +44,8 @@ export const validateEnv = cleanEnv(process.env, {
   PORT: port({ default: 3000 }),
   Saltrounds: num({ default: 11 }),
   BASE_URL: str(),
-  CLOUDFRONT_AVI_BUCKET_URL: str(),
-  CLOUDFRONT_KEY_PAIR_ID: str(),
-  CLOUDFRONT_PRIVATE_KEY: str(),
   AWS_BUCKET_ARN: str(),
   FRONTEND_URL: str(),
-  HELCIM_BASE_URL: str(),
-  HELCIM_API_KEY: str(),
   // New auth/env vars
   ALLOWED_STATES: str({ default: "" }),
   // TWILIO_ACCOUNT_SID: str({ default: "" }),
@@ -71,7 +66,7 @@ export const validateEnv = cleanEnv(process.env, {
   STRIPE_SECRET_KEY: str({ default: "" }),
   STRIPE_PUBLISHABLE_KEY: str({ default: "" }),
   STRIPE_WEBHOOK_SECRET: str({ default: "" }),
-  FORCE_CREATOR_ELIGIBLE: str({ default: "false" }), //if set to true, creator can create paid room without creating stripe connect account  
+  FORCE_CREATOR_ELIGIBLE: str({ default: "false" }), //if set to true, creator can create paid room without creating stripe connect account
   SENDGRID_API_KEY: str({ default: "" }),
   ADMIN_NOTIFICATION_EMAIL: str({ default: "" }),
   EMAIL_FROM: str({ default: "" }),

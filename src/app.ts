@@ -11,7 +11,12 @@ import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import Controller from "./utils/interfaces/controller.interface";
 import { validateEnv } from "../config/validateEnv";
-import { createMessage, createMessageWithMedia, editMessage, deleteMessage } from "./resources/chats/chats.service";
+import {
+  createMessage,
+  createMessageWithMedia,
+  editMessage,
+  deleteMessage,
+} from "./resources/chats/chats.service";
 import { ChatTypes, IChatsDocument } from "./resources/chats/chats.interface";
 import Chats from "./resources/chats/chats.model";
 import fileUpload from "express-fileupload";
@@ -33,7 +38,7 @@ class App {
     this.Http = http.createServer(this.express);
     this.io = new Server(this.Http, {
       cors: {
-        origin: "*", // Replace with front-end URL
+        origin: validateEnv.BASE_URL || "*", // Replace with front-end URL
         methods: ["GET", "POST"],
         allowedHeaders: ["my-custom-header"],
         credentials: true,
@@ -48,12 +53,14 @@ class App {
     this.initializeErrorHandling();
   }
   private initializeMiddleware(): void {
-    this.express.use(fileUpload({
-      limits: { fileSize: 50 * 1024 * 1024 },
-      useTempFiles: true,
-      tempFileDir: require("os").tmpdir(),
-      abortOnLimit: true,
-    }));
+    this.express.use(
+      fileUpload({
+        limits: { fileSize: 50 * 1024 * 1024 },
+        useTempFiles: true,
+        tempFileDir: require("os").tmpdir(),
+        abortOnLimit: true,
+      })
+    );
     this.express.use(express.json());
     this.express.use(express.urlencoded({ extended: true }));
     this.express.use(bodyParser.json());
@@ -61,14 +68,16 @@ class App {
     this.express.use(cookieParser());
     this.express.use(morgan("dev"));
     this.express.use(compression());
-    this.express.use(session({
-      secret: env.COOKIE,
-      resave: false,
-      saveUninitialized: false,
-    }));
+    this.express.use(
+      session({
+        secret: env.COOKIE,
+        resave: false,
+        saveUninitialized: false,
+      })
+    );
     this.express.use(passport.initialize());
     this.express.use(passport.session());
-    this.express.set('passport', passport);
+    this.express.set("passport", passport);
     this.express.set("io", this.io);
     this.express.use((req, res, next) => {
       /* Log the req */
@@ -85,18 +94,25 @@ class App {
       next();
     });
   }
-  private initializePassport(): void{
-    passport.serializeUser((user: any, done: (err: any, id?: any) => void) =>{
+  private initializePassport(): void {
+    passport.serializeUser((user: any, done: (err: any, id?: any) => void) => {
       done(null, user._id?.toString?.() || user.id);
     });
-    passport.deserializeUser(async (id: string, done: (err: any, user?: any | false | null) => void) => {
-      try {
-        const user = await User.findById(id).select("-auth.password -refreshToken");
-        done(null, user);
-      } catch (e) {
-        done(e as any, null);
+    passport.deserializeUser(
+      async (
+        id: string,
+        done: (err: any, user?: any | false | null) => void
+      ) => {
+        try {
+          const user = await User.findById(id).select(
+            "-auth.password -refreshToken"
+          );
+          done(null, user);
+        } catch (e) {
+          done(e as any, null);
+        }
       }
-    });
+    );
 
     passport.use(
       new GoogleStrategy(
@@ -105,31 +121,43 @@ class App {
           clientSecret: env.GOOGLE_CLIENT_SECRET,
           callbackURL: env.GOOGLE_CALLBACK_URL,
         },
-        async (_accessToken: string, _refreshToken: string, profile: any, done: (err: any, user?: any, info?: any) => void) => {
+        async (
+          _accessToken: string,
+          _refreshToken: string,
+          profile: any,
+          done: (err: any, user?: any, info?: any) => void
+        ) => {
           try {
             const googleId = profile.id;
             const email = profile.emails?.[0]?.value?.toLowerCase();
             const firstName = profile.name?.givenName || "";
             const lastName = profile.name?.familyName || "";
 
-            let user = await User.findOne({ $or: [ { googleId }, { "auth.email": email } ] }).exec();
+            let user = await User.findOne({
+              $or: [{ googleId }, { "auth.email": email }],
+            }).exec();
             if (!user) {
-              const safeUsername = `google_${String(googleId || "user").slice(0, 24)}`; 
+              const safeUsername = `google_${String(googleId || "user").slice(
+                0,
+                24
+              )}`;
               user = await User.create({
                 auth: {
                   username: safeUsername,
-                  password: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
+                  password:
+                    Math.random().toString(36).slice(2) +
+                    Math.random().toString(36).slice(2),
                   email,
                 },
                 profile: {
                   firstName: firstName || "Google",
                   lastName: lastName || "User",
-                  birthDate: new Date('2000-01-01T00:00:00Z'),
+                  birthDate: new Date("2000-01-01T00:00:00Z"),
                 },
                 isVerified: true,
                 googleId,
               } as any);
-            } else if (!(user as any).googleId){
+            } else if (!(user as any).googleId) {
               (user as any).googleId = googleId;
               await user.save();
             }
@@ -143,11 +171,13 @@ class App {
   }
   private initializeSocket(io: Server): void {
     let connectionCount = 0;
-    
+
     (io as any).on("connection", (socket: Socket) => {
       connectionCount++;
-      
-      Logging.log(`A user connected: ${socket.id} (Total connections: ${connectionCount})`);
+
+      Logging.log(
+        `A user connected: ${socket.id} (Total connections: ${connectionCount})`
+      );
 
       socket.on("error", (error: unknown) => {
         Logging.error(`Socket error: ${error}`);
@@ -173,7 +203,7 @@ class App {
           replyTo,
         }: any) => {
           try {
-            const messageData ={
+            const messageData = {
               sender,
               receiver,
               roomId: room_Id,
@@ -181,7 +211,7 @@ class App {
               message,
               chatType,
               media,
-              replyTo
+              replyTo,
             };
 
             const newMessage = await createMessageWithMedia(messageData);
@@ -207,7 +237,7 @@ class App {
                   newMessage
                 );
               }
-              
+
               socket.emit("receiveMessage", newMessage);
             }
           } catch (error) {
@@ -216,18 +246,43 @@ class App {
         }
       );
 
-      socket.on("editMessage", async ({ messageId, newMessage, userId }) =>{
+      socket.on("editMessage", async ({ messageId, newMessage, userId }) => {
         try {
-          const updatedMessage = await editMessage(messageId, newMessage, userId);
-          
+          const updatedMessage = await editMessage(
+            messageId,
+            newMessage,
+            userId
+          );
+
           if (updatedMessage) {
-            if (updatedMessage.chatType === ChatTypes.user && updatedMessage.receiver) {
-              io.to(updatedMessage.receiver as unknown as string).emit("messageEdited", updatedMessage);
-              io.to(updatedMessage.sender as unknown as string).emit("messageEdited", updatedMessage);
-            } else if (updatedMessage.chatType === ChatTypes.group && updatedMessage.group) {
-              io.to(updatedMessage.group as unknown as string).emit("messageEdited", updatedMessage);
-            } else if (updatedMessage.chatType === ChatTypes.room && updatedMessage.room_Id) {
-              io.to(updatedMessage.room_Id as unknown as string).emit("messageEdited", updatedMessage);
+            if (
+              updatedMessage.chatType === ChatTypes.user &&
+              updatedMessage.receiver
+            ) {
+              io.to(updatedMessage.receiver as unknown as string).emit(
+                "messageEdited",
+                updatedMessage
+              );
+              io.to(updatedMessage.sender as unknown as string).emit(
+                "messageEdited",
+                updatedMessage
+              );
+            } else if (
+              updatedMessage.chatType === ChatTypes.group &&
+              updatedMessage.group
+            ) {
+              io.to(updatedMessage.group as unknown as string).emit(
+                "messageEdited",
+                updatedMessage
+              );
+            } else if (
+              updatedMessage.chatType === ChatTypes.room &&
+              updatedMessage.room_Id
+            ) {
+              io.to(updatedMessage.room_Id as unknown as string).emit(
+                "messageEdited",
+                updatedMessage
+              );
             }
           }
         } catch (error) {
@@ -238,35 +293,55 @@ class App {
       socket.on("deleteMessage", async ({ messageId, userId }) => {
         try {
           const success = await deleteMessage(messageId, userId);
-          
+
           if (success) {
             const message = await Chats.findById(messageId);
             if (message) {
               if (message.chatType === ChatTypes.user && message.receiver) {
-                io.to(message.receiver as unknown as string).emit("messageDeleted", { messageId });
-                io.to(message.sender as unknown as string).emit("messageDeleted", { messageId });
-              } else if (message.chatType === ChatTypes.group && message.group) {
-                io.to(message.group as unknown as string).emit("messageDeleted", { messageId });
-              } else if (message.chatType === ChatTypes.room && message.room_Id) {
-                io.to(message.room_Id as unknown as string).emit("messageDeleted", { messageId });
+                io.to(message.receiver as unknown as string).emit(
+                  "messageDeleted",
+                  { messageId }
+                );
+                io.to(message.sender as unknown as string).emit(
+                  "messageDeleted",
+                  { messageId }
+                );
+              } else if (
+                message.chatType === ChatTypes.group &&
+                message.group
+              ) {
+                io.to(message.group as unknown as string).emit(
+                  "messageDeleted",
+                  { messageId }
+                );
+              } else if (
+                message.chatType === ChatTypes.room &&
+                message.room_Id
+              ) {
+                io.to(message.room_Id as unknown as string).emit(
+                  "messageDeleted",
+                  { messageId }
+                );
               }
             }
           }
-        } catch (error){
+        } catch (error) {
           socket.emit("messageError", { error: "Failed to delete message" });
         }
       });
 
       socket.on("disconnect", () => {
         connectionCount--;
-        Logging.log(`A user disconnected: ${socket.id} (Total connections: ${connectionCount})`);
+        Logging.log(
+          `A user disconnected: ${socket.id} (Total connections: ${connectionCount})`
+        );
       });
     });
     Logging.log(`Socket is ready`);
   }
   private initializeControllers(controllers: Controller[]): void {
     this.express.use("/", stripeWebhook);
-    
+
     controllers.forEach((controller: Controller) => {
       this.express.use(controller.router);
     });

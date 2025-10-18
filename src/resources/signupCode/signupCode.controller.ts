@@ -15,7 +15,6 @@ import { RequiredAuth, AuthorizeRole } from "../../middleware/auth.middleware";
 import { IRoles } from "../user/user.interface";
 import Logging from "../../library/logging";
 
-
 class SignupCodeController implements Controller {
   public path = "/signup-codes";
   public router = Router();
@@ -27,7 +26,6 @@ class SignupCodeController implements Controller {
   private initializeRoutes(): void {
     this.router.post(
       `${this.path}/request`,
-      RequiredAuth,
       validationMiddleware(validate.requestCode),
       this.requestSignupCode
     );
@@ -82,19 +80,25 @@ class SignupCodeController implements Controller {
     next: NextFunction
   ): Promise<Response | void> => {
     try {
-      if (!req.user?._id) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      // if (!req.user?._id) {
+      //   return res.status(401).json({ message: "Unauthorized" });
+      // }
 
-      const { name: nameFromBody, message } = req.body;
-      const userEmail = (req.user as any)?.email as string | undefined;
-      const derivedName =
-        (req.user as any)?.username ||
-        (req.user as any)?.profile?.name ||
-        nameFromBody;
+      const { name, message, email } = req.body;
+      // const userEmail = (req.user as any)?.email as string | undefined;
+      // const derivedName =
+      //   (req.user as any)?.username ||
+      //   (req.user as any)?.profile?.name ||
+      //   nameFromBody;
 
-      const { default: EmailService } = await import("../../utils/email/email.service");
-      await EmailService.sendAdminSignupCodeRequest({ name: derivedName, email: userEmail as string, message });
+      const { default: EmailService } = await import(
+        "../../utils/email/email.service"
+      );
+      await EmailService.sendAdminSignupCodeRequest({
+        name,
+        email,
+        message,
+      });
 
       return res.status(200).json({
         message: "Your request has been received. We'll contact you soon.",
@@ -105,11 +109,11 @@ class SignupCodeController implements Controller {
     }
   };
 
-  private generateCode = async(
+  private generateCode = async (
     req: Request,
     res: Response,
     next: NextFunction
-  ): Promise<Response | void> =>{
+  ): Promise<Response | void> => {
     try {
       if (!req.user?._id) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -118,10 +122,16 @@ class SignupCodeController implements Controller {
       const { maxUsages, expiresAt } = req.body;
       const adminId = req.user._id as string;
 
-      const signupCode = await generateSignupCode(adminId, maxUsages, expiresAt);
+      const signupCode = await generateSignupCode(
+        adminId,
+        maxUsages,
+        expiresAt
+      );
 
       if (!signupCode) {
-        return res.status(400).json({ message: "Failed to generate signup code" });
+        return res
+          .status(400)
+          .json({ message: "Failed to generate signup code" });
       }
 
       res.status(201).json({
@@ -145,8 +155,8 @@ class SignupCodeController implements Controller {
       const isValid = await validateAndUseSignupCode(code);
 
       if (!isValid) {
-        return res.status(400).json({ 
-          message: "Invalid or expired signup code" 
+        return res.status(400).json({
+          message: "Invalid or expired signup code",
         });
       }
 
@@ -164,7 +174,7 @@ class SignupCodeController implements Controller {
     req: Request,
     res: Response,
     next: NextFunction
-  ): Promise<Response | void> =>{
+  ): Promise<Response | void> => {
     try {
       if (!req.user?._id) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -222,8 +232,9 @@ class SignupCodeController implements Controller {
       const updatedCode = await updateSignupCode(codeId, adminId, updates);
 
       if (!updatedCode) {
-        return res.status(404).json({ 
-          message: "Signup code not found or you're not authorized to update it" 
+        return res.status(404).json({
+          message:
+            "Signup code not found or you're not authorized to update it",
         });
       }
 
@@ -257,8 +268,9 @@ class SignupCodeController implements Controller {
       const success = await deactivateSignupCode(codeId, adminId);
 
       if (!success) {
-        return res.status(404).json({ 
-          message: "Signup code not found or you're not authorized to deactivate it" 
+        return res.status(404).json({
+          message:
+            "Signup code not found or you're not authorized to deactivate it",
         });
       }
 

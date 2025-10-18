@@ -91,7 +91,6 @@ const deleteUser = Joi.object().keys({
 
 const changePassword = Joi.object().keys({
   auth: Joi.object<IAuth>().keys({
-    username: Joi.string().alphanum().min(3).max(30).required(),
     password: Joi.string()
       .pattern(new RegExp(/^[a-zA-Z0-9]{3,30}$/))
       .min(8)
@@ -152,10 +151,23 @@ const updateUser = Joi.object<IUserDocument>().keys({
   }),
 });
 
+const requestPasswordChange = Joi.object<IUserDocument>().keys({
+  auth: Joi.object<IAuth>().keys({
+    email: Joi.string().email().required(),
+  }),
+});
+
+const userPreferences = Joi.object<IUserPreferences>().keys({
+  favoriteTypesOfRooms: Joi.array().optional(),
+  favoriteCityState: Joi.array().optional(),
+});
+
 export default {
   create,
+  userPreferences,
   changePassword,
   deleteUser,
   loginUser,
   updateUser,
+  requestPasswordChange,
 };

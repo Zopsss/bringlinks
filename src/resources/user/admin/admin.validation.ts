@@ -9,7 +9,7 @@ import {
   Miles,
   ProfilePrivacy,
   Race,
-} from "./user.interface";
+} from "../user.interface";
 
 // Validation for admin registration
 const registerAdmin = Joi.object().keys({
@@ -74,8 +74,3 @@ const registerAdmin = Joi.object().keys({
 export default {
   registerAdmin,
 };
-
-
-
-
-

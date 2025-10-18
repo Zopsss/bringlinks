@@ -8,6 +8,32 @@ import Likes from "../resources/likes/likes.model";
 import Logging from "../library/logging";
 import { RoomPrivacy } from "../resources/room/room.interface";
 
+//check if refresh token belongs to the user
+export const isUserRefreshToken = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const paramUserId = String(req.params.userId);
+    const authUserId = String(req.user?._id);
+    if (paramUserId !== authUserId)
+      return res.status(403).send({ message: "Must have valid user id" });
+    const user_Id = authUserId as string;
+
+    const foundUser = await User.findById(user_Id);
+    if (!foundUser)
+      return res.status(403).send({ message: "Must be your account" });
+
+    if (foundUser.refreshToken !== req.params.refreshToken)
+      return res.status(403).send({ message: "Invalid refresh token" });
+
+    next();
+  } catch (error: any) {
+    Logging.error(error.message);
+    throw error.message;
+  }
+};
 //takes the id of the user making the request
 // checks if that is the user making request account
 export const isUserAccount = async (
@@ -22,9 +48,7 @@ export const isUserAccount = async (
       return res.status(403).send({ message: "Must have valid user id" });
     const user_Id = authUserId as string;
 
-    const foundUser = await User.find({ _id: user_Id })
-      .clone()
-      .exec();
+    const foundUser = await User.find({ _id: user_Id }).clone().exec();
 
     if (!foundUser)
       return res.status(403).send({ message: "Must be your account" });
@@ -43,7 +67,9 @@ export const postPermissions = async (
   try {
     const { userid, postid } = req.params;
     if (!userid || !postid) {
-      return res.status(400).json({ message: "User ID and Post ID are required" });
+      return res
+        .status(400)
+        .json({ message: "User ID and Post ID are required" });
     }
     const user_Id = userid as string;
     const post_Id = postid as string;
@@ -69,7 +95,9 @@ export const commentPermissions = async (
   try {
     const { userid, postid, commentid } = req.params;
     if (!userid || !postid || !commentid) {
-      return res.status(400).json({ message: "User ID, Post ID, and Comment ID are required" });
+      return res
+        .status(400)
+        .json({ message: "User ID, Post ID, and Comment ID are required" });
     }
     const user_Id = userid as string;
     const post_Id = postid as string;
@@ -100,7 +128,9 @@ export const likePermissions = async (
   try {
     const { userid, postid, likeid } = req.params;
     if (!userid || !postid || !likeid) {
-      return res.status(400).json({ message: "User ID, Post ID, and Like ID are required" });
+      return res
+        .status(400)
+        .json({ message: "User ID, Post ID, and Like ID are required" });
     }
 
     const user_Id = userid as string;
@@ -160,7 +190,9 @@ export const enteredRoomPermissions = async (
   try {
     const { userId, roomId } = req.params;
     if (!userId || !roomId) {
-      return res.status(400).json({ message: "User ID and Room ID are required" });
+      return res
+        .status(400)
+        .json({ message: "User ID and Room ID are required" });
     }
 
     const user_Id = userId as string;
@@ -171,7 +203,9 @@ export const enteredRoomPermissions = async (
       entered_id: user_Id,
     }).clone();
 
-    if (!foundUserRoom?.entered_id?.some((id: any) => id?.toString() === user_Id))
+    if (
+      !foundUserRoom?.entered_id?.some((id: any) => id?.toString() === user_Id)
+    )
       return res
         .status(401)
         .json({ error: "Must be in the room to perform this action" });
@@ -191,7 +225,9 @@ export const friendshipPermissions = async (
   try {
     const { userId, friendId } = req.params;
     if (!userId || !friendId) {
-      return res.status(400).json({ message: "User ID and Friend ID are required" });
+      return res
+        .status(400)
+        .json({ message: "User ID and Friend ID are required" });
     }
     const user_Id = userId as string;
     const friend_Id = friendId as string;
@@ -227,7 +263,9 @@ export const roomAdminPermissions = async (
   try {
     const { userId, roomId } = req.params;
     if (!userId || !roomId) {
-      return res.status(400).json({ message: "User ID and Room ID are required" });
+      return res
+        .status(400)
+        .json({ message: "User ID and Room ID are required" });
     }
     const user_Id = userId as string;
     const room_Id = roomId as string;
@@ -257,7 +295,9 @@ export const isInvitedPermissions = async (
   try {
     const { userId, roomId } = req.params;
     if (!userId || !roomId) {
-      return res.status(400).json({ message: "User ID and Room ID are required" });
+      return res
+        .status(400)
+        .json({ message: "User ID and Room ID are required" });
     }
     const user_Id = userId as string;
     const room_Id = roomId as string;
@@ -288,7 +328,9 @@ export const walletPermissions = async (
   try {
     const { userId, walletId } = req.params;
     if (!userId || !walletId) {
-      return res.status(400).json({ message: "User ID and Wallet ID are required" });
+      return res
+        .status(400)
+        .json({ message: "User ID and Wallet ID are required" });
     }
 
     const user_Id = userId as string;
@@ -310,7 +352,7 @@ export const walletPermissions = async (
   }
 };
 
-export const creatorPermissions = async(
+export const creatorPermissions = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -330,12 +372,12 @@ export const creatorPermissions = async(
 
     const foundUser = await User.findOne({
       _id: user_Id,
-      role: "CREATOR"
+      role: "CREATOR",
     }).clone();
 
     if (!foundUser) {
-      return res.status(403).json({ 
-        message: "User must be a creator to create paid rooms" 
+      return res.status(403).json({
+        message: "User must be a creator to create paid rooms",
       });
     }
 

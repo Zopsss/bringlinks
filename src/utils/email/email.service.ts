@@ -17,11 +17,17 @@ class EmailService {
     sgMail.setApiKey(apiKey);
   }
 
-  static async sendAdminSignupCodeRequest(payload: AdminSignupCodeRequestPayload) {
+  static async sendAdminSignupCodeRequest(
+    payload: AdminSignupCodeRequestPayload
+  ) {
     this.ensureConfigured();
 
-    const adminEmail = (validateEnv as any).ADMIN_NOTIFICATION_EMAIL as string | undefined;
-    const fromEmail = ((validateEnv as any).EMAIL_FROM as string | undefined) || (adminEmail as string);
+    const adminEmail = (validateEnv as any).ADMIN_NOTIFICATION_EMAIL as
+      | string
+      | undefined;
+    const fromEmail =
+      ((validateEnv as any).EMAIL_FROM as string | undefined) ||
+      (adminEmail as string);
 
     if (!adminEmail || adminEmail.trim().length === 0) {
       throw new Error("Missing ADMIN_NOTIFICATION_EMAIL in environment");
@@ -52,12 +58,75 @@ class EmailService {
     } catch (error: any) {
       const response = error?.response;
       const body = response?.body;
-      Logging.error({ hint: "SendGrid send failed", status: response?.statusCode, body });
-      throw new Error(body?.errors?.[0]?.message || error.message || "Failed to send email");
+      Logging.error({
+        hint: "SendGrid send failed",
+        status: response?.statusCode,
+        body,
+      });
+      throw new Error(
+        body?.errors?.[0]?.message || error.message || "Failed to send email"
+      );
+    }
+  }
+  static async sendPasswordRequestEmail(email: string, refreshToken: string) {
+    this.ensureConfigured();
+    let link: string;
+    Logging.log(email);
+    Logging.log(refreshToken);
+    const adminEmail = validateEnv.ADMIN_NOTIFICATION_EMAIL as
+      | string
+      | undefined;
+    const fromEmail =
+      (validateEnv.EMAIL_FROM as string | undefined) || (adminEmail as string);
+
+    if (!email || email.trim().length === 0 || !refreshToken) {
+      throw new Error("Missing Email or Refresh Token");
+    }
+    if (
+      validateEnv.NODE_ENV === "development" ||
+      validateEnv.NODE_ENV === "staging"
+    ) {
+      link = "http://localhost:8081/reset-password/?token=" + refreshToken;
+    } else {
+      link =
+        "https://bringinglinkups.com/reset-password/?token=" + refreshToken;
+    }
+
+    const subject = "Password Request";
+    const lines: string[] = [];
+    lines.push("A user has requested a password reset.");
+    lines.push("");
+    lines.push(`Email: ${email}`);
+    lines.push("");
+    lines.push("Message:");
+    lines.push("");
+    lines.push("Please reset your password by clicking the link below.");
+    lines.push("");
+    lines.push(`Reset Link: ${link}`);
+
+    const msg = {
+      to: email,
+      from: fromEmail,
+      subject,
+      text: lines.join("\n"),
+    } as any;
+
+    try {
+      await sgMail.send(msg);
+      Logging.log("Password request email sent");
+    } catch (error: any) {
+      const response = error?.response;
+      const body = response?.body;
+      Logging.error({
+        hint: "SendGrid send failed",
+        status: response?.statusCode,
+        body,
+      });
+      throw new Error(
+        body?.errors?.[0]?.message || error.message || "Failed to send email"
+      );
     }
   }
 }
 
 export default EmailService;
-
-

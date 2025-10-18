@@ -1,8 +1,8 @@
-import User from "./user.model";
-import { IUserDocument, IRoles } from "./user.interface";
-import jwt from "../../utils/authentication/jwt.createtoken";
-import Logging from "../../library/logging";
-import { validateEnv } from "../../../config/validateEnv";
+import User from "../user.model";
+import { IUserDocument, IRoles } from "../user.interface";
+import jwt from "../../../utils/authentication/jwt.createtoken";
+import Logging from "../../../library/logging";
+import { validateEnv } from "../../../../config/validateEnv";
 
 export const registerAdmin = async (userData: any) => {
   try {
@@ -32,7 +32,7 @@ export const registerAdmin = async (userData: any) => {
 
     const createdUser = await User.create(userToCreate);
     Logging.log(`Admin user created: ${createdUser._id}`);
-    
+
     if (!createdUser) throw new Error("Admin registration failed");
 
     const [token, refreshToken] = jwt.CreateToken({
@@ -56,7 +56,8 @@ export const registerAdmin = async (userData: any) => {
       .clone()
       .exec();
 
-    if (!userWithoutPassword) throw new Error("Admin user not found after creation");
+    if (!userWithoutPassword)
+      throw new Error("Admin user not found after creation");
 
     return [userWithoutPassword, token, refreshToken];
   } catch (err: any) {
@@ -64,8 +65,3 @@ export const registerAdmin = async (userData: any) => {
     throw err.message;
   }
 };
-
-
-
-
-

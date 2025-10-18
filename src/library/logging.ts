@@ -2,14 +2,14 @@ import chalk from "chalk";
 import { validateEnv } from "../../config/validateEnv";
 
 export default class Logging {
-  private static isDevelopment = validateEnv.NODE_ENV === "development";
+  private static isDevelopment = validateEnv.NODE_ENV;
 
   public static log = (args: any) => {
-    if (this.isDevelopment) this.info(args);
+    if (this.isDevelopment === "development") this.info(args);
   };
 
   public static info = (args: any) => {
-    if (this.isDevelopment) {
+    if (this.isDevelopment === "development") {
       console.log(
         chalk.blue(`[${new Date().toLocaleString()}] [INFO]`),
         typeof args === "string" ? chalk.blueBright(args) : args
@@ -18,7 +18,7 @@ export default class Logging {
   };
 
   public static warning = (args: any) => {
-    if (this.isDevelopment) {
+    if (this.isDevelopment === "development") {
       console.log(
         chalk.yellow(`[${new Date().toLocaleString()}] [WARN]`),
         typeof args === "string" ? chalk.yellowBright(args) : args
@@ -27,7 +27,7 @@ export default class Logging {
   };
 
   public static error = (args: any) => {
-    if (this.isDevelopment) {
+    if (this.isDevelopment === "development") {
       console.log(
         chalk.red(`[${new Date().toLocaleString()}] [ERROR]`),
         typeof args === "string" ? chalk.redBright(args) : args

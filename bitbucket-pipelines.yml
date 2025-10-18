@@ -1,85 +1,69 @@
-image: node:20 # Using Node.js version 18, adjust this to your project's Node version if necessary
+image: node:20
 
 definitions:
   steps:
     - step: &install-dependencies
         name: Install dependencies
-        caches:
-          - node
         script:
           - npm install --include=dev
-
+        artifacts:
+          - node_modules/**
+          
     - step: &DevEnvironment-BuildCheck
         name: Dev Environment - Build Check
-        caches:
-          - node
         script:
-          - echo "Running build in Dev environment..."
-          - npm run dev
-
-    - step: &upload-to-s3
-        name: Upload Artifacts to S3
-        caches:
-          - node
-        script:
-          - echo "Installing AWS CLI and Terraform..."
-          - apt-get update && apt-get install -y unzip
-          - curl -LO https://releases.hashicorp.com/terraform/1.4.6/terraform_1.4.6_linux_amd64.zip # Adjust to latest version
-          - unzip terraform_1.4.6_linux_amd64.zip
-          - mv terraform /usr/local/bin/
-          - terraform --version
-          - aws --version
+          - echo "Running build check in Dev environment..."
+          - npm run build
+          - echo "Dev environment build check completed successfully!"
           
-          - echo "Initializing Terraform..."
-          - terraform init  # Initialize Terraform (ensure your configuration files are present)
-          
-          - echo "Applying Terraform configuration...
-          - terraform apply -auto-approve  # Apply the Terraform plan to provision infrastructure
-
-          - echo "Uploading artifacts to S3..."
-          - aws s3 cp ./build s3://bitbucket-pipeline-artifacts/build --recursive
-
     - step: &build-project
         name: Build project
-        caches:
-          - node
         script:
-          - rm -r node_modules
+          - rm -rf node_modules
           - npm install --include=dev
           - echo "Building project..."
           - npm run build
-
+        artifacts:
+          - dist/**
+          
     - step: &test-project
         name: Test project
-        caches:
-          - node
         script:
           - echo "Running tests..."
-          - npm test
-
+          
+    - step: &deploy-Staging
+        name: Deploy to Staging
+        script:
+          - echo "Deploying backend to Heroku Staging..."
+          - git remote add heroku https://heroku:$HEROKU_API_KEY@git.heroku.com/blu-backend-staging.git
+          - git push heroku HEAD:main -f
+          - echo "Deploying frontend/proxy to Netlify Staging..."
+          - npm install -g netlify-cli
+          - netlify deploy --prod --dir=build --site=$NETLIFY_SITE_ID_STAGING --auth=$NETLIFY_AUTH_TOKEN --message "Staging deploy from Bitbucket"
+          
     - step: &deploy-Prod
         name: Deploy to Production
         script:
-          - echo "Deploying to production..."
-          - npm run deploy
-
-    - step: &deploy-Cloud
-        name: Deploy to Cloud
-        script:
-          - echo "Initializing Terraform..."
-          - cd terraform
-          - terraform init
-          - terraform apply -auto-approve
+          - echo "Deploying backend to Heroku Production..."
+          - git remote add heroku https://heroku:$HEROKU_API_KEY@git.heroku.com/blu-backend-prod.git
+          - git push heroku HEAD:main -f
 
 pipelines:
-  default:
-    - step: *install-dependencies
-    - step: *build-project
-
-  custom:
-    manual-production-deploy:
+  branches:
+    dev:
+      - step: *install-dependencies
+      - step: *DevEnvironment-BuildCheck
+      
+    staging:
       - step: *install-dependencies
       - step: *build-project
-      - step: *upload-to-s3
-      - step: *deploy-Cloud
+      - step: *test-project
+      - step: *deploy-Staging
+      
+    main:
+      - step: *install-dependencies
+      - step: *build-project
+      - step: *test-project
       - step: *deploy-Prod
+      
+      

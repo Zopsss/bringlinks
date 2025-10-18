@@ -56,17 +56,63 @@ const refreshTokenUser = async (token: string, userId: string) => {
     if (!newToken) throw new Error("Token is not created");
     if (!freshToken) throw new Error("Refresh token is not created");
 
+    const updatedUser = await User.findByIdAndUpdate(
+      { _id: foundUser._id },
+      {
+        $set: {
+          refreshToken: freshToken,
+        },
+      }
+    )
+      .select("-auth.password -role -refreshToken")
+      .exec()
+      .catch((err: any) => {
+        Logging.error(err);
+        throw err;
+      });
+
+    if (!updatedUser) throw new Error("User not found");
+
     return { newToken, freshToken };
   } catch (err) {
     Logging.error(err);
     throw err; // Re-throw the error so the controller can handle it
   }
 };
+export const requestPassword = async (userData: {
+  auth: {
+    email: string;
+  };
+}) => {
+  try {
+    const { email } = userData.auth;
+    const user = await User.findOne({ "auth.email": email });
+    if (!user) throw new Error("User not found");
+    if (!user.auth.email) throw new Error("Email not found");
+
+    if (user.auth.email !== email) throw new Error("Email not match");
+
+    // Send email to user
+    const { default: EmailService } = await import(
+      "../../utils/email/email.service"
+    );
+    await EmailService.sendPasswordRequestEmail(
+      user.auth.email,
+      user.refreshToken
+    );
+
+    return;
+  } catch (err: any) {
+    Logging.error(err);
+    throw err;
+  }
+};
+
 const registerUser = async (userData: any) => {
   try {
     const { auth, signupCode, state, ...userProfile } = userData;
 
-    const parseAllowedStates = (): string[]=>{
+    const parseAllowedStates = (): string[] => {
       const raw = validateEnv.ALLOWED_STATES || "";
       return raw
         .split(",")
@@ -75,8 +121,10 @@ const registerUser = async (userData: any) => {
     };
 
     const allowedStates = parseAllowedStates();
-    const isFromAllowedState = allowedStates.includes(state.trim().toLowerCase());
-    
+    const isFromAllowedState = allowedStates.includes(
+      state.trim().toLowerCase()
+    );
+
     if (!isFromAllowedState) {
       throw new Error("Service not available in your state");
     }
@@ -84,7 +132,9 @@ const registerUser = async (userData: any) => {
     if (signupCode) {
       const isValidCode = await validateAndUseSignupCode(signupCode);
       if (!isValidCode) {
-        throw new Error("Invalid signup code or code has reached maximum usage limit");
+        throw new Error(
+          "Invalid signup code or code has reached maximum usage limit"
+        );
       }
     }
 
@@ -102,12 +152,12 @@ const registerUser = async (userData: any) => {
       auth,
       profile: userProfile.profile,
       state,
-      isVerified: true, 
+      isVerified: true,
     };
 
     const createdUser = await User.create(userToCreate);
     Logging.log(`User created with signup code: ${createdUser._id}`);
-    
+
     if (!createdUser) throw new Error("User registration failed");
 
     const [token, refreshToken]: Secret[] = jwt.CreateToken({
@@ -118,7 +168,6 @@ const registerUser = async (userData: any) => {
     });
 
     const createdUserId = createdUser._id as string;
-
     const userWithoutPassword = await User.findByIdAndUpdate(
       { _id: createdUserId },
       {
@@ -263,7 +312,12 @@ const updatePassword = async (
     if (!foundedUser) throw new Error("User is not found");
 
     hashPass(foundedUser, password);
-    return foundedUser;
+
+    return foundedUser.populate({
+      path: "auth",
+      model: "User",
+      select: "-password -role -refreshToken",
+    });
   } catch (err: any) {
     Logging.error(err);
     throw err;
@@ -565,14 +619,17 @@ export const deleteIMG = async (id: string) => {
 
     await deleteAviIMG(foundUser.profile.avi.aviName);
 
-    const updatedUser = await User.updateOne({ _id: _id }, {
-      $pull: {
-        avi: {
-          aviUrl: undefined,
-          aviName: undefined,
+    const updatedUser = await User.updateOne(
+      { _id: _id },
+      {
+        $pull: {
+          avi: {
+            aviUrl: undefined,
+            aviName: undefined,
+          },
         },
-      },
-    }).clone();
+      }
+    ).clone();
 
     return updatedUser.upsertedCount;
   } catch (err: any) {
