@@ -10,7 +10,6 @@ import {
 import { RequiredAuth } from "../../middleware/auth.middleware";
 import ValidationMiddleware from "../../middleware/val.middleware";
 import { createReporting, updateReporting } from "./report.validation";
-import { invalidateCache, advancedCacheMiddleware } from "../../middleware/cache.middleware";
 
 class ReportController implements Controller {
   public path = "/report";
@@ -21,21 +20,16 @@ class ReportController implements Controller {
   }
 
   private initializeRoutes(): void {
-    this.router.get(`${this.path}/:reportId`, RequiredAuth, advancedCacheMiddleware({
-      keyBuilder: (req) => `cache:report:${req.params.reportId}`,
-      ttl: 1800
-    }), this.getReport);
+    this.router.get(`${this.path}/:reportId`, RequiredAuth, this.getReport);
     this.router.patch(
       `${this.path}/:reportId`,
       RequiredAuth,
       ValidationMiddleware(updateReporting),
-      invalidateCache('report', 'reportId'),
       this.updateReport
     );
     this.router.delete(
       `${this.path}/:reportId`,
       RequiredAuth,
-      invalidateCache('report', 'reportId'),
       this.deleteReport
     );
     this.router.post(
