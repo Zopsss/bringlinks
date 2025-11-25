@@ -40,7 +40,8 @@ import { IRoles, IUsers } from "./user.interface";
 import { putS3Object } from "../../utils/ImageServices/user.Img";
 import { UploadedFile } from "express-fileupload";
 import { checkImageUrl } from "../../utils/ImageServices/helperFunc.ts/checkImgUrlExpiration";
-import { userCacheMiddleware, invalidateUserCache } from "../../middleware/userCache.middleware";
+import { userCacheMiddleware, invalidateUserCache } from "../../middleware/cache/userCache.middleware";
+import CacheService from "../../utils/cache/cache.service";
 const imgName = ImageNAME();
 
 class UserController implements Controller {
@@ -106,13 +107,13 @@ class UserController implements Controller {
     this.router.get(
       `${this.path}/schedule/:userId`,
       RequiredAuth,
-      userCacheMiddleware({ ttl: 3600 }),
       this.getSchedule
     );
     this.router.patch(
       `${this.path}/updatepassword/:refreshToken`,
       validationMiddleware(validate.changePassword),
       isUserRefreshToken,
+      invalidateUserCache(),
       this.changePassword
     );
     this.router.delete(
@@ -123,7 +124,10 @@ class UserController implements Controller {
       invalidateUserCache(),
       this.deactivateUser
     );
-    this.router.get(`${this.path}/logout/:userId`, RequiredAuth, this.logout);
+    this.router.get(`${this.path}/logout/:userId`,
+      RequiredAuth,
+      invalidateUserCache(),
+      this.logout);
     this.router.post(
       `${this.path}/follow/:followerId/:userId`,
       RequiredAuth,
@@ -149,7 +153,6 @@ class UserController implements Controller {
       `${this.path}/image/:userId`,
       RequiredAuth,
       isUserAccount,
-      userCacheMiddleware({ ttl: 3600 }),
       this.retrieveImg
     );
     this.router.delete(
@@ -163,7 +166,6 @@ class UserController implements Controller {
       `${this.path}/recommendedRooms/:userId`,
       RequiredAuth,
       isUserAccount,
-      userCacheMiddleware({ ttl: 1800 }),
       this.getRecommendedRooms
     );
   }
@@ -225,10 +227,12 @@ class UserController implements Controller {
     next: NextFunction
   ): Promise<Response | void> => {
     try {
-      const [foundUser, token, refreshToken] = await loginUser(req.body);
+      const [foundUser, token, refreshToken, foundUserId] = await loginUser(req.body);
 
       if (!foundUser || !token)
         return res.status(400).json({ message: "User not found" });
+      
+      await CacheService.clearEntityCache("user", foundUserId.toString());
 
       res.cookie(validateEnv.COOKIE, token);
       res.status(200).json({ foundUser, token, refreshToken });

@@ -1,25 +1,12 @@
 import { Request, Response, NextFunction } from "express";
-import CacheService from "../utils/cache/cache.service";
-import Logging from "../library/logging";
-import { getUserById } from "../resources/user/user.service";
-
-/**
- * User-specific cache configuration options
- */
+import CacheService from "../../utils/cache/cache.service";
+import Logging from "../../library/logging";
+import { getUserById } from "../../resources/user/user.service";
 interface UserCacheOptions {
   ttl?: number; // Time to live in seconds
   enabled?: boolean; // Whether caching is enabled
 }
 
-/**
- * Cache middleware specifically for user endpoints
- * Handles caching patterns for:
- * - User by ID
- * - User by username
- * - User schedule
- * - User image
- * - Recommended rooms
- */
 export const userCacheMiddleware = (options: UserCacheOptions = {}) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (req.method !== "GET") {
@@ -34,6 +21,11 @@ export const userCacheMiddleware = (options: UserCacheOptions = {}) => {
 
     try {
       const cacheKey = buildUserCacheKey(req);
+      
+      if (!cacheKey) {
+        Logging.warning(`Failed to generate User cache key for request: ${req.originalUrl}`);
+        return next();
+      }
 
       const cachedData = await CacheService.get(cacheKey);
       if (cachedData) {
@@ -47,7 +39,8 @@ export const userCacheMiddleware = (options: UserCacheOptions = {}) => {
 
       res.json = function (data: any) {
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          CacheService.set(cacheKey, data, ttl).catch((error: any) => {
+          const cacheData = sanitizeUserForCache(data);
+          CacheService.set(cacheKey, cacheData, ttl).catch((error: any) => {
             Logging.error(`Failed to cache user response: ${error}`);
           });
         }
@@ -62,14 +55,18 @@ export const userCacheMiddleware = (options: UserCacheOptions = {}) => {
   };
 };
 
-/**
- * Invalidate user cache for specific operations
- * Clears ALL user-related cache entries when user data is modified.
- */
 export const invalidateUserCache = () => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { userId, username, followerId } = req.params;
+      let { userId, username, followerId } = req.params;
+
+      if (req.path.includes("/updatepassword/")) {
+        if (!req.user?._id) {
+          Logging.warning(`Failed to invalidate User caching while updating password, user id was not provided.`);
+          return next();
+        }
+        userId = req.user._id.toString();
+      }
 
       const userIdsToInvalidate = new Set<string>();
 
@@ -82,21 +79,9 @@ export const invalidateUserCache = () => {
       }
 
       for (const id of userIdsToInvalidate) {
-        if (req.path.includes("/image/") || req.path.includes("/deactivate/")) {
-          await CacheService.clearEntityCache("user:image", userId);
-        }
-        
-        if (!req.path.includes("/follow/") || !req.path.includes("/unfollow/")) {
-          await CacheService.clearEntityCache("user:recommendedRooms", id);
-          
-          if (!req.path.includes("/userpreferences/") || req.path.includes("/update/")  || req.path.includes("/deactivate/")) {
-            await CacheService.clearEntityCache("user:schedule", id);
-          }
-        }
-        
         await CacheService.clearEntityCache("user", id);
         Logging.info(
-          `Invalidated all user caches for ID: ${id} (includes image, schedule, recommended rooms)`
+          `Invalidated all user caches for ID: ${id}`
         );
       }
 
@@ -120,33 +105,28 @@ export const invalidateUserCache = () => {
   };
 };
 
-/**
- * Helper function to build cache keys based on route patterns
- */
-function buildUserCacheKey(req: Request): string {
+function buildUserCacheKey(req: Request): string | undefined {
   const { userId, username } = req.params;
 
-  if (req.path.includes("/image/") && userId) {
-    return `cache:user:image:${userId}`;
-  }
-
-  if (req.path.includes("/schedule/") && userId) {
-    return `cache:user:schedule:${userId}`;
-  }
-
-  if (req.path.includes("/recommendedRooms/") && userId) {
-    return `cache:user:recommendedRooms:${userId}`;
-  }
-
-  if (req.path.includes("/username/") && username) {
+  if (req.path.includes("/username/")) {
+    if (!username) return;
     return `cache:user:username:${username}`;
   }
 
   if (userId) {
     return `cache:user:${userId}`;
   }
+}
 
-  return `cache:user:${req.originalUrl}`;
+function sanitizeUserForCache(data: any) {
+  if (data && typeof data === 'object') {
+    const sanitized = { ...data };
+    delete sanitized.refreshToken;
+    delete sanitized.signupCode;
+    delete sanitized.googleId;
+    return sanitized;
+  }
+  return data;
 }
 
 export default userCacheMiddleware;
