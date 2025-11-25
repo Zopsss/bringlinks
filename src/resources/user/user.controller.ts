@@ -40,7 +40,7 @@ import { IRoles, IUsers } from "./user.interface";
 import { putS3Object } from "../../utils/ImageServices/user.Img";
 import { UploadedFile } from "express-fileupload";
 import { checkImageUrl } from "../../utils/ImageServices/helperFunc.ts/checkImgUrlExpiration";
-import { userCacheMiddleware, invalidateUserCache } from "../../middleware/userCache.middleware";
+import { userCacheMiddleware, invalidateUserCache } from "../../middleware/cache/userCache.middleware";
 const imgName = ImageNAME();
 
 class UserController implements Controller {

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import CacheService from "../utils/cache/cache.service";
-import Logging from "../library/logging";
-import { getUserById } from "../resources/user/user.service";
+import CacheService from "../../utils/cache/cache.service";
+import Logging from "../../library/logging";
+import { getUserById } from "../../resources/user/user.service";
 
 /**
  * User-specific cache configuration options
@@ -34,6 +34,8 @@ export const userCacheMiddleware = (options: UserCacheOptions = {}) => {
 
     try {
       const cacheKey = buildUserCacheKey(req);
+      
+      if (!cacheKey) return next();
 
       const cachedData = await CacheService.get(cacheKey);
       if (cachedData) {
@@ -96,7 +98,7 @@ export const invalidateUserCache = () => {
         
         await CacheService.clearEntityCache("user", id);
         Logging.info(
-          `Invalidated all user caches for ID: ${id} (includes image, schedule, recommended rooms)`
+          `Invalidated all user caches for ID: ${id}`
         );
       }
 
@@ -109,7 +111,7 @@ export const invalidateUserCache = () => {
 
       if (usernameToInvalidate) {
         const usernameCacheKey = `cache:user:username:${usernameToInvalidate}`;
-        await CacheService.del(usernameCacheKey);
+        await CacheService.clearEntityCache("user", usernameCacheKey);
       }
 
       next();
@@ -123,7 +125,7 @@ export const invalidateUserCache = () => {
 /**
  * Helper function to build cache keys based on route patterns
  */
-function buildUserCacheKey(req: Request): string {
+function buildUserCacheKey(req: Request): string | undefined {
   const { userId, username } = req.params;
 
   if (req.path.includes("/image/") && userId) {
@@ -145,8 +147,6 @@ function buildUserCacheKey(req: Request): string {
   if (userId) {
     return `cache:user:${userId}`;
   }
-
-  return `cache:user:${req.originalUrl}`;
 }
 
 export default userCacheMiddleware;
