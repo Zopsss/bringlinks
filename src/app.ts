@@ -24,7 +24,12 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import User from "./resources/user/user.model";
 import { validateEnv as env } from "../config/validateEnv";
+<<<<<<< Updated upstream
 import stripeWebhook from "./resources/user/creator/stripe.webhook";
+=======
+import stripeWebhook, { stripeWebhookHandler } from "./resources/user/creator/stripe.webhook";
+import createRateLimiter from "./middleware/rateLimiter.middleware";
+>>>>>>> Stashed changes
 
 class App {
   public express: Application;
@@ -44,6 +49,12 @@ class App {
       },
     });
     this.port = port;
+    // this.express.use("/", stripeWebhook);
+    this.express.post(
+      "/stripe/webhook",
+      express.raw({ type: "application/json" }),
+      stripeWebhookHandler
+    );
     this.initializeMiddleware();
     this.initializePassport();
     this.initializeDatabaseConnection();
@@ -52,6 +63,13 @@ class App {
     this.initializeErrorHandling();
   }
   private initializeMiddleware(): void {
+    this.express.use((req, res, next) => {
+      if (req.originalUrl.startsWith("/stripe/webhook")) {
+        console.log("req.originalUrl: ", req.originalUrl);
+        return next();
+      }
+      express.json()(req, res, next);
+    });
     this.express.use(
       fileUpload({
         limits: { fileSize: 300 * 1024 * 1024 },
@@ -59,9 +77,7 @@ class App {
         abortOnLimit: true,
       })
     );
-    this.express.use(express.json());
     this.express.use(express.urlencoded({ extended: true }));
-    this.express.use(bodyParser.json());
     this.express.use(
       cors({
         origin: (origin, callback) => {
@@ -381,8 +397,6 @@ class App {
     Logging.log(`Socket is ready`);
   }
   private initializeControllers(controllers: Controller[]): void {
-    this.express.use("/", stripeWebhook);
-
     controllers.forEach((controller: Controller) => {
       this.express.use(controller.router);
     });

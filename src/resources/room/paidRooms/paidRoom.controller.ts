@@ -165,6 +165,10 @@ class PaidRoomController implements Controller {
         return res.status(403).json({ message: "Stripe Connect account required" });
       }
 
+      console.log("acc id: ", creator._id)
+      console.log("acc id: ", creator.stripeConnectAccountId)
+      console.log("userID: ", userId)
+      console.log("roomId: ", roomId)
       const session = await StripeService.createCheckoutSession({
         amount: ticketAmount,
         currency: "usd",

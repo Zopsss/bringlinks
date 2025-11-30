@@ -26,6 +26,7 @@ declare global {
     interface Request {
       paidRoom?: PaidRoomRequestType;
       wallet?: WalletRequestType;
+      rawBody?: string;
     }
   }
 }

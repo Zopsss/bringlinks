@@ -411,3 +411,66 @@ export const createNewPaidRoom = async (
     throw err;
   }
 };
+
+export const recordTicketPurchase = async (
+  roomId: string,
+  userId: string,
+  tierTitle: string,
+  quantity: number,
+  receiptId: string, // The Stripe Payment Intent ID
+  amountTotal: number // Amount in cents
+) => {
+  try {
+    // 1. Find the specific tier to ensure it exists and matches logic
+    const paidRoomCheck = await PaidRoom.findOne({ roomId });
+    if (!paidRoomCheck) throw new Error("Paid Room not found");
+
+    // normalize tier title matching
+    const pricingIndex = paidRoomCheck.tickets.pricing.findIndex(
+      (p) =>
+        p.title.toLowerCase() === tierTitle.toLowerCase() ||
+        p.tiers === tierTitle
+    );
+
+    if (pricingIndex === -1) throw new Error("Tier not found in DB");
+    
+    // 2. Atomic Update
+    const updatedPaidRoom = await PaidRoom.findOneAndUpdate(
+      {
+        roomId: roomId,
+        "tickets.pricing.title": paidRoomCheck.tickets.pricing[pricingIndex].title // Ensure we target correct array elem
+      },
+      {
+        $addToSet: {
+          paidUsers: new mongoose.Types.ObjectId(userId),
+          receiptId: receiptId,
+        },
+        $inc: {
+          "tickets.totalSold": quantity,
+          "tickets.totalTicketsAvailable": -quantity,
+          "tickets.totalRevenue": amountTotal / 100, // Convert cents to dollars if your DB stores float/int dollars
+          // Update the specific array element
+          [`tickets.pricing.${pricingIndex}.sold`]: quantity,
+          [`tickets.pricing.${pricingIndex}.available`]: -quantity,
+        },
+      },
+      { new: true }
+    );
+
+    if (!updatedPaidRoom) throw new Error("Failed to update PaidRoom stats");
+
+    // 3. Update the Main Room to show the user has entered/purchased
+    const updatedRoom = await Rooms.findByIdAndUpdate(
+      roomId,
+      {
+        $addToSet: { entered_id: new mongoose.Types.ObjectId(userId) },
+      },
+      { new: true }
+    );
+
+    return { updatedPaidRoom, updatedRoom };
+  } catch (err) {
+    Logging.error(err);
+    throw err;
+  }
+};
